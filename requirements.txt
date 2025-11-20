@@ -1,3 +1,5 @@
 qrcode[pil]
 Pillow
 requests
+Django
+djangorestframework
