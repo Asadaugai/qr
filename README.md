@@ -1,12 +1,21 @@
-# QR Code Generator
+# QR Code Generator with Analytics
 
-A simple Django app to generate QR codes from URLs or uploaded files.
+A simple Django app to generate QR codes from URLs or uploaded files with comprehensive analytics tracking.
 
 ## Features
 
 - ✅ Generate QR codes from any URL
 - ✅ Upload files and generate QR codes with secure random links (UUID tokens)
 - ✅ Download generated QR codes as PNG images
+- ✅ **Track comprehensive analytics:**
+  - Total scans
+  - Unique users
+  - Countries & Cities (IP geolocation)
+  - Device types (iPhone, Android, Desktop, etc.)
+  - Browsers & Operating Systems
+  - Time of day distribution
+  - Traffic sources
+- ✅ Beautiful analytics dashboard
 - ✅ Clean, modern UI with gradient design
 - ✅ File paths are hidden - only secure tokens are exposed
 
@@ -93,3 +102,36 @@ requirements.txt     # Python dependencies
 - qrcode library with PIL
 - SQLite database
 - Pure CSS (no external frameworks)
+
+
+## Analytics Features
+
+### What Gets Tracked:
+When someone scans a QR code (for files), the system automatically tracks:
+
+1. **Total Scans** - Every time the QR is scanned
+2. **Unique Users** - Based on IP + User Agent hash
+3. **Location** - Country and City (using IP geolocation)
+4. **Device Info** - iPhone, Android, Desktop, Tablet
+5. **Browser** - Chrome, Safari, Firefox, etc.
+6. **Operating System** - iOS, Android, Windows, etc.
+7. **Time of Day** - Hourly distribution of scans
+8. **Traffic Source** - Where the scan came from (usually "Direct" for QR codes)
+
+### How to View Analytics:
+1. Generate a file QR code
+2. On the result page, click "📊 View Analytics"
+3. See comprehensive stats and charts
+
+### Privacy Note:
+- IP addresses are stored but only used for geolocation and unique user counting
+- User identifiers are MD5 hashed (IP + User Agent)
+- No personal information is collected
+
+## API Used:
+- **ipapi.co** - Free IP geolocation (no API key needed for basic usage)
+- Limit: 1,000 requests/day on free tier
+
+## New Dependencies:
+- `requests` - For making HTTP calls to geolocation API
+- `user-agents` - For parsing device/browser information

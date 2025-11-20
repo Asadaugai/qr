@@ -141,13 +141,40 @@
         .back-link:hover {
             text-decoration: underline;
         }
+        
+        .nav-links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔲 QR Code Generator</h1>
+            <h1>QR Code Generator</h1>
             <p>Generate QR codes from URLs or files</p>
+        </div>
+        
+        <div class="nav-links">
+            <a href="{% url 'home' %}" class="nav-link">🏠 Home</a>
+            <a href="{% url 'check_analytics' %}" class="nav-link">📊 Check Analytics</a>
         </div>
         
         {% block content %}

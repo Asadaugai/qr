@@ -1,11 +1,15 @@
 import qrcode
+import hashlib
 from io import BytesIO
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.files.base import ContentFile
 from django.http import FileResponse, Http404
 from django.urls import reverse
-from .models import UploadedFile, QRCode
+from django.contrib import messages
+from django.db.models import Q
+from .models import UploadedFile, QRCode, ScanAnalytics
 from .forms import URLQRForm, FileQRForm
+from .analytics import get_client_ip, get_location_from_ip, get_device_info, get_referrer
 
 
 def home(request):
@@ -85,18 +89,29 @@ def generate_file_qr(request):
 
 
 def qr_result(request, qr_id):
-    """Display generated QR code"""
+    """Display generated QR code with analytics"""
     qr_code = get_object_or_404(QRCode, id=qr_id)
+    
+    # Get analytics stats
+    stats = ScanAnalytics.get_stats_for_qr(qr_code)
     
     context = {
         'qr_code': qr_code,
+        'stats': stats,
     }
     return render(request, 'qr_generator/result.html', context)
 
 
 def download_file(request, token):
-    """Download file using secure token"""
+    """Download file using secure token and track analytics"""
     uploaded_file = get_object_or_404(UploadedFile, token=token)
+    
+    # Get the QR code associated with this file
+    qr_code = uploaded_file.qr_codes.first()
+    
+    if qr_code:
+        # Track the scan
+        track_scan(request, qr_code)
     
     try:
         return FileResponse(
@@ -106,6 +121,32 @@ def download_file(request, token):
         )
     except FileNotFoundError:
         raise Http404("File not found")
+
+
+def track_scan(request, qr_code):
+    """Track analytics for QR code scan"""
+    # Get client information
+    ip_address = get_client_ip(request)
+    device_type, browser, os = get_device_info(request)
+    country, city = get_location_from_ip(ip_address)
+    referrer = get_referrer(request)
+    
+    # Create unique user identifier (hash of IP + User Agent)
+    user_agent = request.META.get('HTTP_USER_AGENT', '')
+    user_identifier = hashlib.md5(f"{ip_address}{user_agent}".encode()).hexdigest()
+    
+    # Save analytics
+    ScanAnalytics.objects.create(
+        qr_code=qr_code,
+        ip_address=ip_address,
+        user_identifier=user_identifier,
+        country=country,
+        city=city,
+        device_type=device_type,
+        browser=browser,
+        operating_system=os,
+        referrer=referrer
+    )
 
 
 def create_qr_code(data):
@@ -125,3 +166,40 @@ def create_qr_code(data):
     buffer = BytesIO()
     img.save(buffer, format='PNG')
     return buffer.getvalue()
+
+
+
+def analytics_dashboard(request, qr_id):
+    """Display detailed analytics dashboard for a QR code"""
+    qr_code = get_object_or_404(QRCode, id=qr_id)
+    stats = ScanAnalytics.get_stats_for_qr(qr_code)
+    
+    context = {
+        'qr_code': qr_code,
+        'stats': stats,
+    }
+    return render(request, 'qr_generator/analytics.html', context)
+
+
+
+def check_analytics(request):
+    """Search and view analytics for QR codes"""
+    search_query = request.GET.get('search', '')
+    qr_codes = None
+    
+    if search_query:
+        # Search by QR ID, filename, or content
+        qr_codes = QRCode.objects.filter(
+            Q(id__icontains=search_query) |
+            Q(content__icontains=search_query) |
+            Q(uploaded_file__original_filename__icontains=search_query)
+        ).select_related('uploaded_file').order_by('-created_at')[:20]
+    else:
+        # Show recent QR codes
+        qr_codes = QRCode.objects.filter(qr_type='file').select_related('uploaded_file').order_by('-created_at')[:10]
+    
+    context = {
+        'qr_codes': qr_codes,
+        'search_query': search_query,
+    }
+    return render(request, 'qr_generator/check_analytics.html', context)

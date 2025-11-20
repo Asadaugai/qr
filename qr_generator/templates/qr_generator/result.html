@@ -30,6 +30,12 @@
         <a href="{% url 'home' %}" class="btn btn-secondary" style="display: inline-block; width: auto;">
             Generate Another
         </a>
+        
+        {% if qr_code.qr_type == 'file' %}
+        <a href="{% url 'analytics_dashboard' qr_code.id %}" class="btn" style="display: inline-block; width: auto; background: #28a745;">
+            📊 View Analytics
+        </a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

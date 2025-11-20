@@ -20,3 +20,15 @@ class FileQRForm(forms.Form):
             'class': 'form-control'
         })
     )
+
+
+class QRImageUploadForm(forms.Form):
+    """Form for uploading QR code image to view analytics"""
+    qr_image = forms.ImageField(
+        label='Upload Your QR Code Image',
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/*'
+        }),
+        help_text='Upload the QR code image you generated to view its analytics'
+    )
