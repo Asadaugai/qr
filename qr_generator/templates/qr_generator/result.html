@@ -16,8 +16,8 @@
                 <p><strong>URL:</strong> {{ qr_code.content }}</p>
             {% else %}
                 <p><strong>File:</strong> {{ qr_code.uploaded_file.original_filename }}</p>
-                <p><strong>Secure Link:</strong> {{ qr_code.content }}</p>
-                <p style="color: #28a745; margin-top: 10px;">✓ File is accessible via secure random token (UUID)</p>
+                <p style="color: #28a745; margin-top: 10px;">✓ File is accessible via secure random link (completely hidden)</p>
+                <p style="color: #666; font-size: 0.9em;">The QR code contains a random UUID - no file path is exposed</p>
             {% endif %}
             
             <p><strong>Created:</strong> {{ qr_code.created_at|date:"F d, Y H:i" }}</p>
