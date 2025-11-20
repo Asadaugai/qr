@@ -16,6 +16,9 @@ urlpatterns = [
     path('create-short', views.CreateShortURLView.as_view(), name='create-short'),
     path('short/<str:short_id>', views.ProxyShortURLView.as_view(), name='proxy-short'),
     
+    # File endpoints
+    path('files/<str:file_id>', views.FileDownloadView.as_view(), name='file-download'),
+    
     # General QR generator
     path('generate-qr', views.GenerateQRView.as_view(), name='generate-qr'),
     

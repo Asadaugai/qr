@@ -46,31 +46,19 @@ class CreateShortURLView(APIView):
 class ProxyShortURLView(APIView):
     """
     GET /api/short/<short_id>
-    Like: @app.get("/api/short/{short_id}")
-    Proxies to actual URL (browser never sees real URL)
+    Redirects to actual URL (for security, short URL is shown in QR code)
     """
     def get(self, request, short_id):
+        from django.shortcuts import redirect
+        
         short_url_obj = get_object_or_404(ShortURL, short_id=short_id)
         
         # Increment access count
         short_url_obj.access_count += 1
         short_url_obj.save(update_fields=['access_count'])
         
-        try:
-            # Fetch actual URL server-side
-            response = requests.get(short_url_obj.actual_url)
-            
-            # Return the actual content
-            return HttpResponse(
-                response.content,
-                content_type=response.headers.get('Content-Type', 'text/html'),
-                status=response.status_code
-            )
-        except Exception as e:
-            return Response(
-                {'error': f'Failed to fetch URL: {str(e)}'},
-                status=status.HTTP_502_BAD_GATEWAY
-            )
+        # Redirect to actual URL
+        return redirect(short_url_obj.actual_url)
 
 
 class GenerateQRView(APIView):
@@ -139,35 +127,89 @@ class BasicQRView(APIView):
 
 
 class PDFQRView(APIView):
-    """POST /api/pdf-qr - Generate PDF QR code"""
+    """POST /api/pdf-qr - Generate PDF QR code (URL or Upload)"""
     def post(self, request):
+        from .models import UploadedFile
+        
         pdf_url = request.data.get('pdf_url')
         description = request.data.get('description')
+        uploaded_file = request.FILES.get('file')
         
-        if not pdf_url:
+        # Option 1: Upload file
+        if uploaded_file:
+            # Validate file type
+            allowed_types = ['application/pdf', 'application/msword', 
+                           'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+            if uploaded_file.content_type not in allowed_types:
+                return Response(
+                    {'error': 'Only PDF and Word documents are allowed'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Save file
+            file_id = UploadedFile.generate_file_id()
+            uploaded_file_obj = UploadedFile.objects.create(
+                file_id=file_id,
+                file=uploaded_file,
+                original_filename=uploaded_file.name,
+                file_type=uploaded_file.content_type,
+                file_size=uploaded_file.size,
+                description=description
+            )
+            
+            # Generate file URL
+            file_url = request.build_absolute_uri(f'/api/files/{file_id}')
+            
+            # Generate QR code
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(file_url)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            buffer = io.BytesIO()
+            img.save(buffer, format='PNG')
+            img_base64 = base64.b64encode(buffer.getvalue()).decode()
+            
+            response_data = {
+                'qr_code': f'data:image/png;base64,{img_base64}',
+                'file_url': file_url,
+                'file_id': file_id,
+                'filename': uploaded_file.name,
+                'file_size': uploaded_file.size,
+                'file_type': uploaded_file.content_type
+            }
+            
+            if description:
+                response_data['description'] = description
+            
+            return Response(response_data)
+        
+        # Option 2: Use URL
+        elif pdf_url:
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(pdf_url)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            buffer = io.BytesIO()
+            img.save(buffer, format='PNG')
+            img_base64 = base64.b64encode(buffer.getvalue()).decode()
+            
+            response_data = {
+                'qr_code': f'data:image/png;base64,{img_base64}',
+                'pdf_url': pdf_url
+            }
+            
+            if description:
+                response_data['description'] = description
+            
+            return Response(response_data)
+        
+        else:
             return Response(
-                {'error': 'pdf_url is required'},
+                {'error': 'Either pdf_url or file is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        qr = qrcode.QRCode(version=1, box_size=10, border=4)
-        qr.add_data(pdf_url)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
-        img_base64 = base64.b64encode(buffer.getvalue()).decode()
-        
-        response_data = {
-            'qr_code': f'data:image/png;base64,{img_base64}',
-            'pdf_url': pdf_url
-        }
-        
-        if description:
-            response_data['description'] = description
-        
-        return Response(response_data)
 
 
 class APIQRView(APIView):
@@ -246,10 +288,33 @@ class SecureQRView(APIView):
         return Response(response_data)
 
 
+class FileDownloadView(APIView):
+    """GET /api/files/<file_id> - Download uploaded file"""
+    def get(self, request, file_id):
+        from .models import UploadedFile
+        from django.http import FileResponse
+        
+        file_obj = get_object_or_404(UploadedFile, file_id=file_id)
+        
+        # Increment download count
+        file_obj.download_count += 1
+        file_obj.save(update_fields=['download_count'])
+        
+        # Return file
+        response = FileResponse(file_obj.file.open('rb'))
+        response['Content-Type'] = file_obj.file_type
+        response['Content-Disposition'] = f'inline; filename="{file_obj.original_filename}"'
+        
+        return response
+
+
 class HealthCheckView(APIView):
     """GET /api/health - Health check"""
     def get(self, request):
+        from .models import UploadedFile
+        
         return Response({
             'status': 'healthy',
-            'total_short_urls': ShortURL.objects.count()
+            'total_short_urls': ShortURL.objects.count(),
+            'total_uploaded_files': UploadedFile.objects.count()
         })
