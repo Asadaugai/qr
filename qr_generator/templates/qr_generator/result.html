@@ -1,0 +1,35 @@
+{% extends 'qr_generator/base.html' %}
+
+{% block title %}QR Code Result{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="qr-result">
+        <h2 class="section-title">Your QR Code is Ready!</h2>
+        
+        <img src="{{ qr_code.qr_image.url }}" alt="Generated QR Code">
+        
+        <div class="info-box">
+            <p><strong>Type:</strong> {{ qr_code.get_qr_type_display }}</p>
+            
+            {% if qr_code.qr_type == 'url' %}
+                <p><strong>URL:</strong> {{ qr_code.content }}</p>
+            {% else %}
+                <p><strong>File:</strong> {{ qr_code.uploaded_file.original_filename }}</p>
+                <p><strong>Secure Link:</strong> {{ qr_code.content }}</p>
+                <p style="color: #28a745; margin-top: 10px;">✓ File is accessible via secure random token (UUID)</p>
+            {% endif %}
+            
+            <p><strong>Created:</strong> {{ qr_code.created_at|date:"F d, Y H:i" }}</p>
+        </div>
+        
+        <a href="{{ qr_code.qr_image.url }}" download class="btn" style="display: inline-block; width: auto; margin-top: 20px;">
+            Download QR Code
+        </a>
+        
+        <a href="{% url 'home' %}" class="btn btn-secondary" style="display: inline-block; width: auto;">
+            Generate Another
+        </a>
+    </div>
+</div>
+{% endblock %}

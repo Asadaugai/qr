@@ -1,12 +1,14 @@
 """
-Main URL routing - Like FastAPI's app.include_router()
+URL configuration for qr_project project.
 """
+from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('api/', include('api.urls')),  # All our endpoints start with /api/
+    path('admin/', admin.site.urls),
+    path('', include('qr_generator.urls')),
 ]
 
 # Serve media files in development
