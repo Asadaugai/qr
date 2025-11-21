@@ -83,9 +83,19 @@ class ScanAnalytics(models.Model):
         ]
     
     @staticmethod
-    def get_stats_for_qr(qr_code):
-        """Get comprehensive statistics for a QR code"""
+    def get_stats_for_qr(qr_code, country='', city='', device='', browser=''):
+        """Get comprehensive statistics for a QR code with optional filters"""
         scans = ScanAnalytics.objects.filter(qr_code=qr_code)
+        
+        # Apply filters
+        if country:
+            scans = scans.filter(country=country)
+        if city:
+            scans = scans.filter(city=city)
+        if device:
+            scans = scans.filter(device_type=device)
+        if browser:
+            scans = scans.filter(browser=browser)
         
         return {
             'total_scans': scans.count(),

@@ -170,13 +170,43 @@ def create_qr_code(data):
 
 
 def analytics_dashboard(request, qr_id):
-    """Display detailed analytics dashboard for a QR code"""
+    """Display detailed analytics dashboard with filtering"""
     qr_code = get_object_or_404(QRCode, id=qr_id)
-    stats = ScanAnalytics.get_stats_for_qr(qr_code)
+    
+    # Get filter parameters
+    country_filter = request.GET.get('country', '')
+    city_filter = request.GET.get('city', '')
+    device_filter = request.GET.get('device', '')
+    browser_filter = request.GET.get('browser', '')
+    
+    # Get filtered stats
+    stats = ScanAnalytics.get_stats_for_qr(
+        qr_code, 
+        country=country_filter,
+        city=city_filter,
+        device=device_filter,
+        browser=browser_filter
+    )
+    
+    # Get all unique values for filter dropdowns
+    all_scans = ScanAnalytics.objects.filter(qr_code=qr_code)
+    filter_options = {
+        'countries': all_scans.values_list('country', flat=True).distinct().order_by('country'),
+        'cities': all_scans.values_list('city', flat=True).distinct().order_by('city'),
+        'devices': all_scans.values_list('device_type', flat=True).distinct().order_by('device_type'),
+        'browsers': all_scans.values_list('browser', flat=True).distinct().order_by('browser'),
+    }
     
     context = {
         'qr_code': qr_code,
         'stats': stats,
+        'filter_options': filter_options,
+        'active_filters': {
+            'country': country_filter,
+            'city': city_filter,
+            'device': device_filter,
+            'browser': browser_filter,
+        }
     }
     return render(request, 'qr_generator/analytics.html', context)
 
@@ -203,3 +233,67 @@ def check_analytics(request):
         'search_query': search_query,
     }
     return render(request, 'qr_generator/check_analytics.html', context)
+
+
+
+def download_qr(request, qr_id, format):
+    """Download QR code in different formats"""
+    from PIL import Image
+    import io
+    from django.http import HttpResponse
+    
+    qr_code = get_object_or_404(QRCode, id=qr_id)
+    
+    # Open the original QR code image
+    img = Image.open(qr_code.qr_image.path)
+    
+    # Convert to RGB if needed (for JPEG)
+    if format.lower() in ['jpg', 'jpeg'] and img.mode != 'RGB':
+        img = img.convert('RGB')
+    
+    # Handle SVG separately
+    if format.lower() == 'svg':
+        import qrcode.image.svg
+        qr = qrcode.QRCode(
+            image_factory=qrcode.image.svg.SvgPathImage,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_code.content)
+        qr.make(fit=True)
+        
+        buffer = io.BytesIO()
+        img_svg = qr.make_image(fill_color="black", back_color="white")
+        img_svg.save(buffer)
+        
+        response = HttpResponse(buffer.getvalue(), content_type='image/svg+xml')
+        response['Content-Disposition'] = f'attachment; filename="qr_code_{qr_id}.svg"'
+        return response
+    
+    # For raster formats
+    buffer = io.BytesIO()
+    
+    # Map format names to PIL format names
+    format_map = {
+        'jpg': 'JPEG',
+        'jpeg': 'JPEG',
+        'png': 'PNG',
+        'webp': 'WEBP',
+        'bmp': 'BMP',
+    }
+    
+    pil_format = format_map.get(format.lower(), 'PNG')
+    img.save(buffer, format=pil_format)
+    buffer.seek(0)
+    
+    content_types = {
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'webp': 'image/webp',
+        'bmp': 'image/bmp',
+    }
+    
+    response = HttpResponse(buffer.getvalue(), content_type=content_types.get(format.lower(), 'image/png'))
+    response['Content-Disposition'] = f'attachment; filename="qr_code_{qr_id}.{format.lower()}"'
+    return response
